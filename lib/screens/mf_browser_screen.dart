@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/models/mutual_fund.dart';
+import 'package:mf_tracker/screens/fund_detail_screen.dart';
 
 class MfBrowserScreen extends StatefulWidget {
   const MfBrowserScreen({super.key});
@@ -29,7 +30,6 @@ class _MfBrowserScreenState extends State<MfBrowserScreen> {
             .map((e) => MutualFund.fromJson(e))
             .toList();
         setState(() {
-
           _allFunds = funds;
           _filteredFunds = funds;
           _isLoading = false;
@@ -51,7 +51,9 @@ class _MfBrowserScreenState extends State<MfBrowserScreen> {
     } else {
       results = _allFunds
           .where(
-            (fund) => fund.schemeName.toLowerCase().contains(enteredKeyword.toLowerCase()),
+            (fund) => fund.schemeName.toLowerCase().contains(
+              enteredKeyword.toLowerCase(),
+            ),
           )
           .toList();
     }
@@ -92,6 +94,17 @@ class _MfBrowserScreenState extends State<MfBrowserScreen> {
                     itemBuilder: (context, index) {
                       final fund = _filteredFunds[index];
                       return ListTile(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => FundDetailScreen(
+                                schemeCode: fund.schemeCode,
+                                schemeName: fund.schemeName,
+                              ),
+                            ),
+                          );
+                        },
                         title: Text(fund.schemeName),
                         subtitle: Text('Code: ${fund.schemeCode}'),
                       );
