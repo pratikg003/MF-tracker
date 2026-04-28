@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/models/fund_details.dart';
@@ -48,6 +49,20 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
     }
   }
 
+  List<FlSpot> _generateChartSpots() {
+    if (_fundDetails == null) return [];
+
+    final reversedData = _fundDetails!.historicalData.reversed.toList();
+
+    final List<FlSpot> spots = [];
+
+    for (int i = 0; i < reversedData.length; i++) {
+      spots.add(FlSpot(i.toDouble(), reversedData[i].nav));
+    }
+
+    return spots;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -61,12 +76,47 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
       appBar: AppBar(title: Text(widget.schemeName)),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Center(
-              child: Text(
-                'Ready to fetch data for Code: ${widget.schemeCode}',
-                style: const TextStyle(fontSize: 18),
+          : Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Center(
+                child: Column(
+                  children: [
+                    Text(
+                      'Ready to fetch data for Code: ${widget.schemeCode}',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+            
+                    const SizedBox(height: 40),
+            
+                    SizedBox(
+                      height: 300,
+                      width: double.infinity,
+                      child: LineChart(
+                        LineChartData(
+                          gridData: const FlGridData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          borderData: FlBorderData(show: false),
+            
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _generateChartSpots(),
+                              isCurved: true,
+                              color: Colors.greenAccent,
+                              barWidth: 2,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: Colors.greenAccent.withValues(alpha: 0.2),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+          ),
     );
   }
 }
