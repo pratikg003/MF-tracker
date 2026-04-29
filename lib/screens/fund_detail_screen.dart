@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/models/fund_details.dart';
+import 'package:mf_tracker/utils/performance_calculator.dart';
 
 class FundDetailScreen extends StatefulWidget {
   final int schemeCode;
@@ -40,6 +41,14 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
         print(
           'Total historical days fetched: ${_fundDetails!.historicalData.length}',
         );
+
+        final threeYearReturn = PerformanceCalculator.getReturnForPeriod(_fundDetails!.historicalData, 3);
+
+        if (threeYearReturn != null) {
+        print('3-Year CAGR: ${threeYearReturn.toStringAsFixed(2)}%');
+      } else {
+        print('Fund is less than 3 years old!');
+      }
       }
     } catch (e) {
       print('Failed to fetch details: $e');
