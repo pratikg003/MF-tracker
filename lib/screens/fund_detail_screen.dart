@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:mf_tracker/database/database_helper.dart';
 import 'package:mf_tracker/models/fund_details.dart';
 import 'package:mf_tracker/utils/performance_calculator.dart';
 
@@ -24,6 +25,18 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
   FundDetails? _fundDetails;
 
   Future<void> _fetchHistoricalData() async {
+    final cachedData = await DatabaseHelper.instance.getCachedFundDetails(
+      widget.schemeCode,
+    );
+
+    if (cachedData != null) {
+      setState(() {
+        _fundDetails = cachedData;
+        _isLoading = false;
+      });
+      print('Loaded ${cachedData.historicalData.length} days from LOCAL CACHE');
+    }
+
     final url = Uri.parse('https://api.mfapi.in/mf/${widget.schemeCode}');
 
     try {
@@ -31,30 +44,38 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
 
       if (response.statusCode == 200) {
         final decodedData = jsonDecode(response.body);
+        final freshFundDetails = FundDetails.fromJson(decodedData);
+
+        await DatabaseHelper.instance.cacheFundDetails(
+          widget.schemeCode,
+          freshFundDetails.toMap(),
+        );
 
         setState(() {
-          _fundDetails = FundDetails.fromJson(decodedData);
+          _fundDetails = freshFundDetails;
           _isLoading = false;
         });
 
-        print('Fund House: ${_fundDetails!.fundHouse}');
-        print(
-          'Total historical days fetched: ${_fundDetails!.historicalData.length}',
+        print('Fetched fresh data from API and UPDATED CACHE');
+
+        final threeYearReturn = PerformanceCalculator.getReturnForPeriod(
+          _fundDetails!.historicalData,
+          3,
         );
 
-        final threeYearReturn = PerformanceCalculator.getReturnForPeriod(_fundDetails!.historicalData, 3);
-
         if (threeYearReturn != null) {
-        print('3-Year CAGR: ${threeYearReturn.toStringAsFixed(2)}%');
-      } else {
-        print('Fund is less than 3 years old!');
-      }
+          print('3-Year CAGR: ${threeYearReturn.toStringAsFixed(2)}%');
+        } else {
+          print('Fund is less than 3 years old!');
+        }
       }
     } catch (e) {
       print('Failed to fetch details: $e');
-      setState(() {
-        _isLoading = false;
-      });
+      if (_fundDetails == null) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -86,17 +107,17 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
           : Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Center(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
                 child: Column(
                   children: [
                     Text(
                       'Ready to fetch data for Code: ${widget.schemeCode}',
                       style: const TextStyle(fontSize: 18),
                     ),
-            
+
                     const SizedBox(height: 40),
-            
+
                     SizedBox(
                       height: 300,
                       width: double.infinity,
@@ -105,7 +126,7 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                           gridData: const FlGridData(show: false),
                           titlesData: const FlTitlesData(show: false),
                           borderData: FlBorderData(show: false),
-            
+
                           lineBarsData: [
                             LineChartBarData(
                               spots: _generateChartSpots(),
@@ -115,7 +136,9 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                               dotData: const FlDotData(show: false),
                               belowBarData: BarAreaData(
                                 show: true,
-                                color: Colors.greenAccent.withValues(alpha: 0.2),
+                                color: Colors.greenAccent.withValues(
+                                  alpha: 0.2,
+                                ),
                               ),
                             ),
                           ],
@@ -125,7 +148,7 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                   ],
                 ),
               ),
-          ),
+            ),
     );
   }
 }

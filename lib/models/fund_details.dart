@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class NavPoint {
   final String date;
   final double nav;
@@ -6,6 +8,10 @@ class NavPoint {
 
   factory NavPoint.fromJson(Map<String, dynamic> json) {
     return NavPoint(date: json['date'], nav: double.tryParse(json['nav']) ?? 0);
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'date': date, 'nav': nav.toString()};
   }
 }
 
@@ -32,5 +38,15 @@ class FundDetails {
       schemeCategory: meta['scheme_category'] ?? "Unkown",
       historicalData: navPoints,
     );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'fundHouse': fundHouse,
+      'schemeCategory': schemeCategory,
+      'historicalData': jsonEncode(
+        historicalData.map((e) => e.toMap()).toList(),
+      ),
+    };
   }
 }
