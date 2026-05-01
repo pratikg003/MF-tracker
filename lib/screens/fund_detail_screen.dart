@@ -23,6 +23,7 @@ class FundDetailScreen extends StatefulWidget {
 class _FundDetailScreenState extends State<FundDetailScreen> {
   bool _isLoading = true;
   FundDetails? _fundDetails;
+  double? _threeYearReturn;
 
   Future<void> _fetchHistoricalData() async {
     final cachedData = await DatabaseHelper.instance.getCachedFundDetails(
@@ -51,17 +52,18 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
           freshFundDetails.toMap(),
         );
 
-        setState(() {
-          _fundDetails = freshFundDetails;
-          _isLoading = false;
-        });
-
-        print('Fetched fresh data from API and UPDATED CACHE');
-
         final threeYearReturn = PerformanceCalculator.getReturnForPeriod(
           _fundDetails!.historicalData,
           3,
         );
+
+        setState(() {
+          _fundDetails = freshFundDetails;
+          _threeYearReturn = threeYearReturn;
+          _isLoading = false;
+        });
+
+        print('Fetched fresh data from API and UPDATED CACHE');
 
         if (threeYearReturn != null) {
           print('3-Year CAGR: ${threeYearReturn.toStringAsFixed(2)}%');
@@ -111,11 +113,10 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
               child: Center(
                 child: Column(
                   children: [
-                    Text(
-                      'Ready to fetch data for Code: ${widget.schemeCode}',
-                      style: const TextStyle(fontSize: 18),
-                    ),
-
+                    // Text(
+                    //   'Ready to fetch data for Code: ${widget.schemeCode}',
+                    //   style: const TextStyle(fontSize: 18),
+                    // ),
                     const SizedBox(height: 40),
 
                     SizedBox(
@@ -145,6 +146,7 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
