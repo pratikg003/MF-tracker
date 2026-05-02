@@ -39,6 +39,25 @@ class DatabaseHelper {
         historicalData TEXT NOT NULL
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE portfolio_funds (
+        schemeCode INTEGER PRIMARY KEY,
+        schemeName TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        schemeCode INTEGER NOT NULL,
+        date TEXT NOT NULL,
+        amount REAL NOT NULL,
+        nav REAL NOT NULL,
+        units REAL NOT NULL,
+        FOREIGN KEY (schemeCode) REFERENCES portfolio_funds (schemeCode) ON DELETE CASCADE
+      )
+    ''');
   }
 
   Future<void> cacheFundDetails(
@@ -82,5 +101,31 @@ class DatabaseHelper {
     }
 
     return null;
+  }
+
+  Future<void> addInvestment({
+    required int schemeCode,
+    required String schemeName,
+    required double amount,
+    required double currentNav,
+  }) async {
+    final db = await instance.database;
+
+    await db.insert('portfolio_funds', {
+      'schemeCode': schemeCode,
+      'schemeName': schemeName,
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+    final double units = amount / currentNav;
+
+    await db.insert('transactions', {
+      'schemeCode': schemeCode,
+      'date': DateTime.now().toIso8601String(),
+      'amount': amount,
+      'nav': currentNav,
+      'units': units,
+    });
+
+    print('SUCCESS: Invested ₹$amount in $schemeName for $units units at NAV $currentNav');
   }
 }

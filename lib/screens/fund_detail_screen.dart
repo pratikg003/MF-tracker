@@ -23,7 +23,7 @@ class FundDetailScreen extends StatefulWidget {
 class _FundDetailScreenState extends State<FundDetailScreen> {
   bool _isLoading = true;
   FundDetails? _fundDetails;
-  double? _threeYearReturn;
+  // double? _threeYearReturn;
 
   Future<void> _fetchHistoricalData() async {
     final cachedData = await DatabaseHelper.instance.getCachedFundDetails(
@@ -59,7 +59,7 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
 
         setState(() {
           _fundDetails = freshFundDetails;
-          _threeYearReturn = threeYearReturn;
+          // _threeYearReturn = threeYearReturn;
           _isLoading = false;
         });
 
@@ -95,6 +95,76 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
     return spots;
   }
 
+  void _showInvestSheet(BuildContext context) {
+    final TextEditingController amountController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Invest in ${widget.schemeName}',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Amount (₹)',
+                  border: OutlineInputBorder(),
+                  prefixIcon: Icon(Icons.currency_rupee),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              ElevatedButton(
+                onPressed: () async {
+                  final amountText = amountController.text;
+                  if (amountText.isEmpty) return;
+
+                  final amount = double.tryParse(amountText);
+                  if (amount == null || amount <= 0) return;
+
+                  final latestNav = _fundDetails!.historicalData.first.nav;
+
+                  await DatabaseHelper.instance.addInvestment(
+                    schemeCode: widget.schemeCode,
+                    schemeName: widget.schemeName,
+                    amount: amount,
+                    currentNav: latestNav,
+                  );
+
+                  if (mounted) Navigator.pop(context);
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Successfully invested ₹$amount')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text('Confirm Investment'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -108,15 +178,21 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
       appBar: AppBar(title: Text(widget.schemeName)),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Center(
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Text(
-                    //   'Ready to fetch data for Code: ${widget.schemeCode}',
-                    //   style: const TextStyle(fontSize: 18),
+                    //   _fundDetails!.fundHouse,
+                    //   style: const TextStyle(
+                    //     fontSize: 18,
+                    //     fontWeight: FontWeight.bold,
+                    //   ),
                     // ),
+                    // Text(_fundDetails!.schemeCategory),
+
                     const SizedBox(height: 40),
 
                     SizedBox(
@@ -150,6 +226,14 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                   ],
                 ),
               ),
+            ),
+      floatingActionButton: _isLoading || _fundDetails == null
+          ? null // Hide the button if data isn't ready
+          : FloatingActionButton.extended(
+              onPressed: () => _showInvestSheet(context),
+              label: const Text('Invest Now'),
+              icon: const Icon(Icons.add_shopping_cart),
+              backgroundColor: Colors.greenAccent,
             ),
     );
   }
