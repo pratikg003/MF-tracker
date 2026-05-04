@@ -7,11 +7,17 @@ class NavPoint {
   NavPoint({required this.date, required this.nav});
 
   factory NavPoint.fromJson(Map<String, dynamic> json) {
-    return NavPoint(date: json['date'], nav: double.tryParse(json['nav']) ?? 0);
+    return NavPoint(
+      date: json['date'] ?? 'Unknown',
+      nav: double.tryParse(json['nav']?.toString() ?? '') ?? 0.0,
+    );
   }
 
   Map<String, dynamic> toMap() {
-    return {'date': date, 'nav': nav.toString()};
+    return {
+      'date': date,
+      'nav': nav.toString(),
+    };
   }
 }
 
@@ -27,15 +33,15 @@ class FundDetails {
   });
 
   factory FundDetails.fromJson(Map<String, dynamic> json) {
-    final meta = json['meta'];
+    final Map<String, dynamic> meta = json['meta'] ?? {};
+    
+    final List<dynamic> dataList = json['data'] as List<dynamic>? ?? [];
 
-    var dataList = json['data'] as List;
-    List<NavPoint> navPoints = dataList
-        .map((i) => NavPoint.fromJson(i))
-        .toList();
+    List<NavPoint> navPoints = dataList.map((i) => NavPoint.fromJson(i)).toList();
+
     return FundDetails(
-      fundHouse: meta['fund_house'] ?? "Unkown",
-      schemeCategory: meta['scheme_category'] ?? "Unkown",
+      fundHouse: meta['fund_house'] ?? 'Unknown Fund',
+      schemeCategory: meta['scheme_category'] ?? 'Defunct/Closed',
       historicalData: navPoints,
     );
   }
@@ -44,9 +50,7 @@ class FundDetails {
     return {
       'fundHouse': fundHouse,
       'schemeCategory': schemeCategory,
-      'historicalData': jsonEncode(
-        historicalData.map((e) => e.toMap()).toList(),
-      ),
+      'historicalData': jsonEncode(historicalData.map((e) => e.toMap()).toList()),
     };
   }
 }

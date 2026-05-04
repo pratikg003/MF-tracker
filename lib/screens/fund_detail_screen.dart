@@ -170,6 +170,16 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
     super.initState();
 
     _fetchHistoricalData();
+
+    // Temporary test in your MfBrowserScreen initState:
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      final myPortfolio = await DatabaseHelper.instance.getPortfolioSummary();
+      for (var item in myPortfolio) {
+        print(
+          'OWNED: ${item.schemeName} | Invested: ₹${item.totalInvested} | Units: ${item.totalUnits}',
+        );
+      }
+    });
   }
 
   @override
@@ -178,50 +188,72 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
       appBar: AppBar(title: Text(widget.schemeName)),
       body: _isLoading
           ? Center(child: CircularProgressIndicator())
+          : _fundDetails == null
+          ? const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  'Failed to load fund details. The fund might be closed or the network failed.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red, fontSize: 16),
+                ),
+              ),
+            )
           : SingleChildScrollView(
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Text(
-                    //   _fundDetails!.fundHouse,
-                    //   style: const TextStyle(
-                    //     fontSize: 18,
-                    //     fontWeight: FontWeight.bold,
-                    //   ),
-                    // ),
-                    // Text(_fundDetails!.schemeCategory),
+                    Text(
+                      _fundDetails!.fundHouse,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    Text(_fundDetails!.schemeCategory),
 
                     const SizedBox(height: 40),
 
-                    SizedBox(
-                      height: 300,
-                      width: double.infinity,
-                      child: LineChart(
-                        LineChartData(
-                          gridData: const FlGridData(show: false),
-                          titlesData: const FlTitlesData(show: false),
-                          borderData: FlBorderData(show: false),
+                    if (_fundDetails!.historicalData.isEmpty)
+                      const Center(
+                        child: Text(
+                          'No historical data available. This fund may be closed or merged.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.red, fontSize: 16),
+                        ),
+                      )
+                    else ...[
+                      // Your Chart (Keep this inside the 'else' block)
+                      SizedBox(
+                        height: 300,
+                        width: double.infinity,
+                        child: LineChart(
+                          LineChartData(
+                            gridData: const FlGridData(show: false),
+                            titlesData: const FlTitlesData(show: false),
+                            borderData: FlBorderData(show: false),
 
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: _generateChartSpots(),
-                              isCurved: true,
-                              color: Colors.greenAccent,
-                              barWidth: 2,
-                              dotData: const FlDotData(show: false),
-                              belowBarData: BarAreaData(
-                                show: true,
-                                color: Colors.greenAccent.withValues(
-                                  alpha: 0.2,
+                            lineBarsData: [
+                              LineChartBarData(
+                                spots: _generateChartSpots(),
+                                isCurved: true,
+                                color: Colors.greenAccent,
+                                barWidth: 2,
+                                dotData: const FlDotData(show: false),
+                                belowBarData: BarAreaData(
+                                  show: true,
+                                  color: Colors.greenAccent.withValues(
+                                    alpha: 0.2,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
-                    ),
+                    ],
                     const SizedBox(height: 40),
                   ],
                 ),

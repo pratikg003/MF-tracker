@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:mf_tracker/models/fund_details.dart';
+import 'package:mf_tracker/models/portfolio_item.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -126,6 +127,26 @@ class DatabaseHelper {
       'units': units,
     });
 
-    print('SUCCESS: Invested ₹$amount in $schemeName for $units units at NAV $currentNav');
+    print(
+      'SUCCESS: Invested ₹$amount in $schemeName for $units units at NAV $currentNav',
+    );
+  }
+
+  Future<List<PortfolioItem>> getPortfolioSummary() async {
+    final db = await instance.database;
+
+    // This is the magic of Relational Databases
+    final List<Map<String, dynamic>> result = await db.rawQuery('''
+      SELECT 
+        p.schemeCode, 
+        p.schemeName, 
+        SUM(t.amount) as totalInvested, 
+        SUM(t.units) as totalUnits
+      FROM portfolio_funds p
+      JOIN transactions t ON p.schemeCode = t.schemeCode
+      GROUP BY p.schemeCode, p.schemeName
+    ''');
+
+    return result.map((map) => PortfolioItem.fromMap(map)).toList();
   }
 }
