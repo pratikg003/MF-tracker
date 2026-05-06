@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:mf_tracker/screens/mf_browser_screen.dart';
+import 'package:mf_tracker/screens/portfolio_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,7 +13,7 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'MF Tracker',
       debugShowCheckedModeBanner: false,
-      home: MfBrowserScreen(),
+      home: PortfolioScreen(),
     );
   }
 }
