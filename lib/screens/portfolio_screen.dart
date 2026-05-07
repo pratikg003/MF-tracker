@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/database/database_helper.dart';
 import 'package:mf_tracker/models/portfolio_item.dart';
+import 'package:mf_tracker/utils/xirr_calculator.dart';
 
 class PortfolioScreen extends StatefulWidget {
   const PortfolioScreen({super.key});
@@ -17,6 +18,8 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   bool _isLoading = true;
   double _grandTotalInvested = 0.0;
   double _grandTotalCurrent = 0.0;
+
+  double? _globalXirr;
 
   Future<void> _loadandCalculatePortfolio() async {
     final items = await DatabaseHelper.instance.getPortfolioSummary();
@@ -54,6 +57,19 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       } catch (e) {
         print('Failed to fetch live NAV for ${item.schemeName}: $e');
       }
+    }
+    final rawTransactions = await DatabaseHelper.instance.getAllTransactions();
+
+    List<Transaction> cashFlows = rawTransactions.map((t) {
+      return Transaction(-t['amount'], DateTime.parse(t['date']));
+    }).toList();
+
+    if (cashFlows.isNotEmpty && _grandTotalCurrent > 0) {
+      cashFlows.add(Transaction(_grandTotalCurrent, DateTime.now()));
+
+      setState(() {
+        _globalXirr = XirrCalculator.calculate(cashFlows);
+      });
     }
   }
 
@@ -125,6 +141,28 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                                     color:
                                         _grandTotalCurrent >=
                                             _grandTotalInvested
+                                        ? Colors.green
+                                        : Colors.red,
+                                  ),
+                                ),
+                              ],
+                            ),
+
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                const Text(
+                                  'XIRR',
+                                  style: TextStyle(color: Colors.grey),
+                                ),
+                                Text(
+                                  _globalXirr == null
+                                      ? '--%'
+                                      : '${_globalXirr!.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: (_globalXirr ?? 0) >= 0
                                         ? Colors.green
                                         : Colors.red,
                                   ),

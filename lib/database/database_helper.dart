@@ -149,4 +149,10 @@ class DatabaseHelper {
 
     return result.map((map) => PortfolioItem.fromMap(map)).toList();
   }
+
+  Future<List<Map<String, dynamic>>> getAllTransactions() async {
+    final db = await instance.database;
+
+    return await db.query('transactions', orderBy: 'date ASC');
+  }
 }
