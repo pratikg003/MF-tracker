@@ -23,26 +23,25 @@ class FundDetailScreen extends StatefulWidget {
 class _FundDetailScreenState extends State<FundDetailScreen> {
   bool _isLoading = true;
   FundDetails? _fundDetails;
-  // double? _threeYearReturn;
+  Map<int, double?> _performance = {};
 
   Future<void> _fetchHistoricalData() async {
+    // 1. Load from Cache
     final cachedData = await DatabaseHelper.instance.getCachedFundDetails(
       widget.schemeCode,
     );
-
     if (cachedData != null) {
+      _calculatePerformance(cachedData);
       setState(() {
         _fundDetails = cachedData;
         _isLoading = false;
       });
-      print('Loaded ${cachedData.historicalData.length} days from LOCAL CACHE');
     }
 
+    // 2. Fetch Fresh Data
     final url = Uri.parse('https://api.mfapi.in/mf/${widget.schemeCode}');
-
     try {
       final response = await http.get(url);
-
       if (response.statusCode == 200) {
         final decodedData = jsonDecode(response.body);
         final freshFundDetails = FundDetails.fromJson(decodedData);
@@ -51,222 +50,243 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
           widget.schemeCode,
           freshFundDetails.toMap(),
         );
-
-        final threeYearReturn = PerformanceCalculator.getReturnForPeriod(
-          _fundDetails!.historicalData,
-          3,
-        );
+        _calculatePerformance(freshFundDetails);
 
         setState(() {
           _fundDetails = freshFundDetails;
-          // _threeYearReturn = threeYearReturn;
           _isLoading = false;
         });
-
-        print('Fetched fresh data from API and UPDATED CACHE');
-
-        if (threeYearReturn != null) {
-          print('3-Year CAGR: ${threeYearReturn.toStringAsFixed(2)}%');
-        } else {
-          print('Fund is less than 3 years old!');
-        }
       }
     } catch (e) {
-      print('Failed to fetch details: $e');
-      if (_fundDetails == null) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (_fundDetails == null) setState(() => _isLoading = false);
     }
+  }
+
+  void _calculatePerformance(FundDetails details) {
+    if (details.historicalData.isEmpty) return;
+    _performance = {
+      1: PerformanceCalculator.getReturnForPeriod(details.historicalData, 1),
+      3: PerformanceCalculator.getReturnForPeriod(details.historicalData, 3),
+      5: PerformanceCalculator.getReturnForPeriod(details.historicalData, 5),
+    };
   }
 
   List<FlSpot> _generateChartSpots() {
     if (_fundDetails == null) return [];
-
     final reversedData = _fundDetails!.historicalData.reversed.toList();
-
-    final List<FlSpot> spots = [];
-
-    for (int i = 0; i < reversedData.length; i++) {
-      spots.add(FlSpot(i.toDouble(), reversedData[i].nav));
-    }
-
-    return spots;
-  }
-
-  void _showInvestSheet(BuildContext context) {
-    final TextEditingController amountController = TextEditingController();
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-            left: 16,
-            right: 16,
-            top: 24,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Invest in ${widget.schemeName}',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Amount (₹)',
-                  border: OutlineInputBorder(),
-                  prefixIcon: Icon(Icons.currency_rupee),
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              ElevatedButton(
-                onPressed: () async {
-                  final amountText = amountController.text;
-                  if (amountText.isEmpty) return;
-
-                  final amount = double.tryParse(amountText);
-                  if (amount == null || amount <= 0) return;
-
-                  final latestNav = _fundDetails!.historicalData.first.nav;
-
-                  await DatabaseHelper.instance.addInvestment(
-                    schemeCode: widget.schemeCode,
-                    schemeName: widget.schemeName,
-                    amount: amount,
-                    currentNav: latestNav,
-                  );
-
-                  if (mounted) Navigator.pop(context);
-                  if (mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Successfully invested ₹$amount')),
-                    );
-                  }
-                },
-                style: ElevatedButton.styleFrom(
-                  minimumSize: const Size(double.infinity, 50),
-                ),
-                child: const Text('Confirm Investment'),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        );
-      },
+    return List.generate(
+      reversedData.length,
+      (i) => FlSpot(i.toDouble(), reversedData[i].nav),
     );
   }
 
   @override
   void initState() {
     super.initState();
-
     _fetchHistoricalData();
+  }
 
-    // Temporary test in your MfBrowserScreen initState:
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      final myPortfolio = await DatabaseHelper.instance.getPortfolioSummary();
-      for (var item in myPortfolio) {
-        print(
-          'OWNED: ${item.schemeName} | Invested: ₹${item.totalInvested} | Units: ${item.totalUnits}',
-        );
-      }
-    });
+  Widget _buildStatItem(String label, int year) {
+    final value = _performance[year];
+    final color = (value ?? 0) >= 0 ? Colors.green : Colors.red;
+    return Column(
+      children: [
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(
+          value == null ? '--' : '${value.toStringAsFixed(1)}%',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: color,
+            fontSize: 16,
+          ),
+        ),
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.schemeName)),
+      appBar: AppBar(title: const Text('Fund Details')),
       body: _isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator())
           : _fundDetails == null
-          ? const Center(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Text(
-                  'Failed to load fund details. The fund might be closed or the network failed.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.red, fontSize: 16),
-                ),
-              ),
-            )
+          ? const Center(child: Text('Failed to load data.'))
           : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _fundDetails!.fundHouse,
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                      ),
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Header Section
+                  Text(
+                    _fundDetails!.fundHouse,
+                    style: const TextStyle(fontSize: 14, color: Colors.grey),
+                  ),
+                  Text(
+                    widget.schemeName,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
                     ),
-                    Text(_fundDetails!.schemeCategory),
-
-                    const SizedBox(height: 40),
-
-                    if (_fundDetails!.historicalData.isEmpty)
-                      const Center(
-                        child: Text(
-                          'No historical data available. This fund may be closed or merged.',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.red, fontSize: 16),
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Text(
+                        '₹${_fundDetails!.historicalData.first.nav.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w900,
                         ),
-                      )
-                    else ...[
-                      // Your Chart (Keep this inside the 'else' block)
-                      SizedBox(
-                        height: 300,
-                        width: double.infinity,
-                        child: LineChart(
-                          LineChartData(
-                            gridData: const FlGridData(show: false),
-                            titlesData: const FlTitlesData(show: false),
-                            borderData: FlBorderData(show: false),
-
-                            lineBarsData: [
-                              LineChartBarData(
-                                spots: _generateChartSpots(),
-                                isCurved: true,
-                                color: Colors.greenAccent,
-                                barWidth: 2,
-                                dotData: const FlDotData(show: false),
-                                belowBarData: BarAreaData(
-                                  show: true,
-                                  color: Colors.greenAccent.withValues(
-                                    alpha: 0.2,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'as of ${_fundDetails!.historicalData.first.date}',
+                        style: const TextStyle(
+                          color: Colors.grey,
+                          fontSize: 12,
                         ),
                       ),
                     ],
-                    const SizedBox(height: 40),
-                  ],
-                ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Performance Row
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatItem('1Y Ret', 1),
+                        _buildStatItem('3Y Ret', 3),
+                        _buildStatItem('5Y Ret', 5),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // Chart Section
+                  if (_fundDetails!.historicalData.isEmpty)
+                    const Center(child: Text('No historical data available.'))
+                  else
+                    SizedBox(
+                      height: 250,
+                      child: LineChart(
+                        LineChartData(
+                          lineTouchData: LineTouchData(
+                            touchTooltipData: LineTouchTooltipData(
+                              getTooltipItems: (touchedSpots) {
+                                return touchedSpots.map((spot) {
+                                  final date = _fundDetails!
+                                      .historicalData
+                                      .reversed
+                                      .toList()[spot.x.toInt()]
+                                      .date;
+                                  return LineTooltipItem(
+                                    '$date\n₹${spot.y}',
+                                    const TextStyle(color: Colors.white),
+                                  );
+                                }).toList();
+                              },
+                            ),
+                          ),
+                          gridData: const FlGridData(show: false),
+                          titlesData: const FlTitlesData(show: false),
+                          borderData: FlBorderData(show: false),
+                          lineBarsData: [
+                            LineChartBarData(
+                              spots: _generateChartSpots(),
+                              isCurved: true,
+                              color: Colors.greenAccent,
+                              barWidth: 2,
+                              dotData: const FlDotData(show: false),
+                              belowBarData: BarAreaData(
+                                show: true,
+                                color: Colors.greenAccent.withAlpha(40),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
       floatingActionButton: _isLoading || _fundDetails == null
-          ? null // Hide the button if data isn't ready
+          ? null
           : FloatingActionButton.extended(
               onPressed: () => _showInvestSheet(context),
               label: const Text('Invest Now'),
               icon: const Icon(Icons.add_shopping_cart),
               backgroundColor: Colors.greenAccent,
             ),
+    );
+  }
+
+  void _showInvestSheet(BuildContext context) {
+    final TextEditingController amountController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Enter Investment Amount',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: amountController,
+              keyboardType: TextInputType.number,
+              autofocus: true,
+              decoration: const InputDecoration(
+                labelText: 'Amount (₹)',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.currency_rupee),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () async {
+                final amount = double.tryParse(amountController.text);
+                if (amount == null || amount <= 0) return;
+                await DatabaseHelper.instance.addInvestment(
+                  schemeCode: widget.schemeCode,
+                  schemeName: widget.schemeName,
+                  amount: amount,
+                  currentNav: _fundDetails!.historicalData.first.nav,
+                );
+                if (mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Investment added to portfolio'),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: const Text('Confirm'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
     );
   }
 }
