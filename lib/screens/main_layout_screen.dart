@@ -12,7 +12,13 @@ class MainLayoutScreen extends StatefulWidget {
 class _MainLayoutScreenState extends State<MainLayoutScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = const [PortfolioScreen(), MfBrowserScreen()];
+  final GlobalKey<PortfolioScreenState> _portfolioKey =
+      GlobalKey<PortfolioScreenState>();
+
+  late final List<Widget> _screens = [
+    PortfolioScreen(key: _portfolioKey),
+    const MfBrowserScreen(),
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -24,6 +30,10 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
           setState(() {
             _selectedIndex = index;
           });
+
+          if (index == 0) {
+            _portfolioKey.currentState?.loadandCalculatePortfolio();
+          }
         },
         destinations: const [
           NavigationDestination(

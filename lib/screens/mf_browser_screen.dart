@@ -94,8 +94,8 @@ class _MfBrowserScreenState extends State<MfBrowserScreen> {
                     itemBuilder: (context, index) {
                       final fund = _filteredFunds[index];
                       return ListTile(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute(
                               builder: (context) => FundDetailScreen(

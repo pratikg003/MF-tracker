@@ -10,10 +10,10 @@ class PortfolioScreen extends StatefulWidget {
   const PortfolioScreen({super.key});
 
   @override
-  State<PortfolioScreen> createState() => _PortfolioScreenState();
+  State<PortfolioScreen> createState() => PortfolioScreenState();
 }
 
-class _PortfolioScreenState extends State<PortfolioScreen> {
+class PortfolioScreenState extends State<PortfolioScreen> {
   List<PortfolioItem> _portfolio = [];
   bool _isLoading = true;
   double _grandTotalInvested = 0.0;
@@ -21,7 +21,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
 
   double? _globalXirr;
 
-  Future<void> _loadandCalculatePortfolio() async {
+  Future<void> loadandCalculatePortfolio() async {
     final items = await DatabaseHelper.instance.getPortfolioSummary();
 
     double tempInvested = 0;
@@ -76,7 +76,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
   @override
   void initState() {
     super.initState();
-    _loadandCalculatePortfolio();
+    loadandCalculatePortfolio();
   }
 
   @override
@@ -85,162 +85,165 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
       appBar: AppBar(title: Text('My Portfolio')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                Card(
-                  margin: EdgeInsets.all(16),
-                  elevation: 4,
-                  child: Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Column(
-                      children: [
-                        const Text(
-                          'Total Portfolio Value',
-                          style: TextStyle(fontSize: 16, color: Colors.grey),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '₹${_grandTotalCurrent.toStringAsFixed(2)}',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+          : RefreshIndicator(
+              onRefresh: loadandCalculatePortfolio,
+              child: Column(
+                children: [
+                  Card(
+                    margin: EdgeInsets.all(16),
+                    elevation: 4,
+                    child: Padding(
+                      padding: EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          const Text(
+                            'Total Portfolio Value',
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
                           ),
-                        ),
-                        const SizedBox(height: 16),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Total Invested',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                Text(
-                                  '₹${_grandTotalInvested.toStringAsFixed(2)}',
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 8),
+                          Text(
+                            '₹${_grandTotalCurrent.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              fontSize: 32,
+                              fontWeight: FontWeight.bold,
                             ),
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text(
-                                  'Overall Return',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                Text(
-                                  '₹${(_grandTotalCurrent - _grandTotalInvested).toStringAsFixed(2)}',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color:
-                                        _grandTotalCurrent >=
-                                            _grandTotalInvested
-                                        ? Colors.green
-                                        : Colors.red,
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Total Invested',
+                                    style: TextStyle(color: Colors.grey),
                                   ),
-                                ),
-                              ],
-                            ),
+                                  Text(
+                                    '₹${_grandTotalInvested.toStringAsFixed(2)}',
+                                    style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text(
+                                    'Overall Return',
+                                    style: TextStyle(color: Colors.grey),
+                                  ),
+                                  Text(
+                                    '₹${(_grandTotalCurrent - _grandTotalInvested).toStringAsFixed(2)}',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color:
+                                          _grandTotalCurrent >=
+                                              _grandTotalInvested
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
 
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                const Text(
-                                  'XIRR',
-                                  style: TextStyle(color: Colors.grey),
-                                ),
-                                Text(
-                                  _globalXirr == null
-                                      ? '--%'
-                                      : '${_globalXirr!.toStringAsFixed(2)}%',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: (_globalXirr ?? 0) >= 0
-                                        ? Colors.green
-                                        : Colors.red,
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  const Text(
+                                    'XIRR',
+                                    style: TextStyle(color: Colors.grey),
                                   ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ],
+                                  Text(
+                                    _globalXirr == null
+                                        ? '--%'
+                                        : '${_globalXirr!.toStringAsFixed(2)}%',
+                                    style: TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      color: (_globalXirr ?? 0) >= 0
+                                          ? Colors.green
+                                          : Colors.red,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                Expanded(
-                  child: _portfolio.isEmpty
-                      ? const Center(child: Text('No investments yet!'))
-                      : ListView.builder(
-                          itemCount: _portfolio.length,
-                          itemBuilder: (context, index) {
-                            final item = _portfolio[index];
+                  Expanded(
+                    child: _portfolio.isEmpty
+                        ? const Center(child: Text('No investments yet!'))
+                        : ListView.builder(
+                            itemCount: _portfolio.length,
+                            itemBuilder: (context, index) {
+                              final item = _portfolio[index];
 
-                            return Card(
-                              margin: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              child: ListTile(
-                                title: Text(
-                                  item.schemeName,
-                                  maxLines: 1,
-                                  overflow: TextOverflow
-                                      .ellipsis, // Prevents giant names from breaking the UI
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                              return Card(
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 8,
+                                ),
+                                child: ListTile(
+                                  title: Text(
+                                    item.schemeName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow
+                                        .ellipsis, // Prevents giant names from breaking the UI
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
-                                subtitle: Text(
-                                  'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
-                                ),
-                                isThreeLine: true,
+                                  subtitle: Text(
+                                    'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
+                                  ),
+                                  isThreeLine: true,
 
-                                trailing: item.currentValue == null
-                                    // If still fetching, show a tiny spinner in the corner
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
+                                  trailing: item.currentValue == null
+                                      // If still fetching, show a tiny spinner in the corner
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      // If fetch is done, show the live data
+                                      : Column(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              '₹${item.currentValue!.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Text(
+                                              'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
+                                              style: const TextStyle(
+                                                color: Colors.grey,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      )
-                                    // If fetch is done, show the live data
-                                    : Column(
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.end,
-                                        children: [
-                                          Text(
-                                            '₹${item.currentValue!.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                          Text(
-                                            'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
-                                            style: const TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 12,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
+                                ),
+                              );
+                            },
+                          ),
+                  ),
+                ],
+              ),
             ),
     );
   }
