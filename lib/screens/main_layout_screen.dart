@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mf_tracker/screens/mf_browser_screen.dart';
 import 'package:mf_tracker/screens/portfolio_screen.dart';
+import 'package:mf_tracker/screens/sip_calculator_screen.dart';
 
 class MainLayoutScreen extends StatefulWidget {
   const MainLayoutScreen({super.key});
@@ -18,6 +19,7 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
   late final List<Widget> _screens = [
     PortfolioScreen(key: _portfolioKey),
     const MfBrowserScreen(),
+    const SipCalculatorScreen(),
   ];
 
   @override
@@ -45,6 +47,11 @@ class _MainLayoutScreenState extends State<MainLayoutScreen> {
             icon: Icon(Icons.search_outlined),
             selectedIcon: Icon(Icons.search),
             label: 'Browser',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.calculate_outlined),
+            selectedIcon: Icon(Icons.calculate),
+            label: 'Tools',
           ),
         ],
       ),
