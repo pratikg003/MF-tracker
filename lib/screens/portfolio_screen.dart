@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/database/database_helper.dart';
@@ -44,18 +45,36 @@ class PortfolioScreenState extends State<PortfolioScreen> {
         if (response.statusCode == 200) {
           final decodedData = jsonDecode(response.body);
 
-          final String latestNavString = decodedData['data'][0]['nav'];
-          final double liveNav = double.tryParse(latestNavString) ?? 0.0;
+          // 1. Safely extract the list
+          final List<dynamic> dataList = decodedData['data'] ?? [];
 
-          setState(() {
-            item.liveNav = liveNav;
-            item.currentValue = item.totalUnits * liveNav;
-            tempCurrent += item.currentValue!;
-            _grandTotalCurrent = tempCurrent;
-          });
+          // 2. Check if it actually has data
+          if (dataList.isNotEmpty) {
+            final String latestNavString = dataList[0]['nav'];
+            final double liveNav = double.tryParse(latestNavString) ?? 0.0;
+
+            setState(() {
+              item.liveNav = liveNav;
+              item.currentValue = item.totalUnits * liveNav;
+              tempCurrent += item.currentValue!;
+              _grandTotalCurrent = tempCurrent;
+            });
+          } else {
+            // 3. Fallback for "dead" funds so the spinner stops
+            setState(() {
+              item.liveNav = 0.0;
+              item.currentValue = 0.0;
+              // Note: We don't add to tempCurrent because it's 0
+            });
+          }
         }
       } catch (e) {
         print('Failed to fetch live NAV for ${item.schemeName}: $e');
+        // Stop the spinner even if there is a massive network failure
+        setState(() {
+          item.liveNav = 0.0;
+          item.currentValue = 0.0;
+        });
       }
     }
     final rawTransactions = await DatabaseHelper.instance.getAllTransactions();
@@ -73,6 +92,43 @@ class PortfolioScreenState extends State<PortfolioScreen> {
     }
   }
 
+  List<PieChartSectionData> _generatePieSections() {
+    if (_portfolio.isEmpty || _grandTotalCurrent <= 0) return [];
+
+    // A palette of colors for our different funds
+    final List<Color> sectionColors = [
+      Colors.blueAccent,
+      Colors.orangeAccent,
+      Colors.purpleAccent,
+      Colors.tealAccent,
+      Colors.pinkAccent,
+    ];
+
+    return List.generate(_portfolio.length, (index) {
+      final item = _portfolio[index];
+      final itemValue = item.currentValue ?? 0;
+
+      // Calculate the percentage this fund makes up of the whole portfolio
+      final percentage = (itemValue / _grandTotalCurrent) * 100;
+
+      return PieChartSectionData(
+        color:
+            sectionColors[index %
+                sectionColors.length], // Loops colors if you have >5 funds
+        value: itemValue,
+        title: percentage > 5
+            ? '${percentage.toStringAsFixed(1)}%'
+            : '', // Hide text if slice is too tiny
+        radius: 40,
+        titleStyle: const TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          color: Colors.white,
+        ),
+      );
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -82,18 +138,21 @@ class PortfolioScreenState extends State<PortfolioScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('My Portfolio')),
+      appBar: AppBar(title: const Text('My Portfolio')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: loadandCalculatePortfolio,
-              child: Column(
+              // We replaced the Column/Expanded with a ListView so it can scroll and refresh!
+              child: ListView(
+                physics: const AlwaysScrollableScrollPhysics(),
                 children: [
+                  // 1. Your Summary Card
                   Card(
-                    margin: EdgeInsets.all(16),
+                    margin: const EdgeInsets.all(16),
                     elevation: 4,
                     child: Padding(
-                      padding: EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(20),
                       child: Column(
                         children: [
                           const Text(
@@ -149,7 +208,6 @@ class PortfolioScreenState extends State<PortfolioScreen> {
                                   ),
                                 ],
                               ),
-
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
@@ -177,71 +235,95 @@ class PortfolioScreenState extends State<PortfolioScreen> {
                       ),
                     ),
                   ),
-                  Expanded(
-                    child: _portfolio.isEmpty
-                        ? const Center(child: Text('No investments yet!'))
-                        : ListView.builder(
-                            itemCount: _portfolio.length,
-                            itemBuilder: (context, index) {
-                              final item = _portfolio[index];
 
-                              return Card(
-                                margin: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                child: ListTile(
-                                  title: Text(
-                                    item.schemeName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow
-                                        .ellipsis, // Prevents giant names from breaking the UI
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
-                                  ),
-                                  isThreeLine: true,
-
-                                  trailing: item.currentValue == null
-                                      // If still fetching, show a tiny spinner in the corner
-                                      ? const SizedBox(
-                                          width: 20,
-                                          height: 20,
-                                          child: CircularProgressIndicator(
-                                            strokeWidth: 2,
-                                          ),
-                                        )
-                                      // If fetch is done, show the live data
-                                      : Column(
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.end,
-                                          children: [
-                                            Text(
-                                              '₹${item.currentValue!.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 16,
-                                              ),
-                                            ),
-                                            Text(
-                                              'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
-                                              style: const TextStyle(
-                                                color: Colors.grey,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                ),
-                              );
-                            },
+                  // 2. Your Pie Chart
+                  if (_portfolio.isNotEmpty && _grandTotalCurrent > 0)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      child: SizedBox(
+                        height: 180,
+                        child: PieChart(
+                          PieChartData(
+                            sectionsSpace: 2,
+                            centerSpaceRadius: 50,
+                            sections: _generatePieSections(),
                           ),
-                  ),
+                        ),
+                      ),
+                    ),
+
+                  // 3. The List of Funds (Using Collection if + Spread Operator)
+                  if (_portfolio.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.all(32.0),
+                      child: Center(child: Text('No investments yet!')),
+                    )
+                  else
+                    ..._portfolio.map((item) {
+                      // We need the index to assign the correct color circle
+                      final index = _portfolio.indexOf(item);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: ListTile(
+                          leading: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: [
+                                Colors.blueAccent,
+                                Colors.orangeAccent,
+                                Colors.purpleAccent,
+                                Colors.tealAccent,
+                                Colors.pinkAccent,
+                              ][index % 5],
+                            ),
+                          ),
+                          title: Text(
+                            item.schemeName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle: Text(
+                            'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
+                          ),
+                          isThreeLine: true,
+                          trailing: item.currentValue == null
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Text(
+                                      '₹${item.currentValue!.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                    Text(
+                                      'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                        ),
+                      );
+                    })
                 ],
               ),
             ),
