@@ -217,13 +217,42 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
                 ],
               ),
             ),
-      floatingActionButton: _isLoading || _fundDetails == null
+
+      bottomNavigationBar: _isLoading || _fundDetails == null
           ? null
-          : FloatingActionButton.extended(
-              onPressed: () => _showInvestSheet(context),
-              label: const Text('Invest Now'),
-              icon: const Icon(Icons.add_shopping_cart),
-              backgroundColor: Colors.greenAccent,
+          : BottomAppBar(
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => _showRedeemSheet(context),
+                      icon: const Icon(
+                        Icons.remove_circle_outline,
+                        color: Colors.red,
+                      ),
+                      label: const Text(
+                        'Sell / Redeem',
+                        style: TextStyle(color: Colors.red),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Colors.red),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showInvestSheet(context),
+                      label: const Text('Invest Now'),
+                      icon: const Icon(Icons.add_shopping_cart),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.greenAccent,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -287,6 +316,107 @@ class _FundDetailScreenState extends State<FundDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  void _showRedeemSheet(BuildContext context) async {
+    final TextEditingController amountController = TextEditingController();
+
+    final double unitsOwned = await DatabaseHelper.instance.getUnitsOwned(
+      widget.schemeCode,
+    );
+
+    if (!mounted) return;
+    if (unitsOwned <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('You do not own any units of this fund.')),
+      );
+      return;
+    }
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Redeem from ${widget.schemeName}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Currently Owned: ${unitsOwned.toStringAsFixed(4)} units',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Redemption Amount (₹)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  final amount = double.tryParse(amountController.text);
+                  if (amount == null || amount <= 0) return;
+
+                  final latestNav = _fundDetails!.historicalData.first.nav;
+                  final unitsToRedeem = amount / latestNav;
+
+                  if (unitsToRedeem > unitsOwned) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Insufficient units to redeem this amount.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  await DatabaseHelper.instance.addRedemption(
+                    schemeCode: widget.schemeCode,
+                    schemeName: widget.schemeName,
+                    amount: amount,
+                    currentNav: latestNav,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Redemption successful.')),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text(
+                  'Confirm Redemption',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -155,4 +155,42 @@ class DatabaseHelper {
 
     return await db.query('transactions', orderBy: 'date ASC');
   }
+
+  Future<double> getUnitsOwned(int schemeCode) async {
+    final db = await instance.database;
+    final result = await db.rawQuery(
+      '''
+      SELECT SUM(units) as totalUnits
+      FROM transactions
+      WHERE schemeCode = ?
+    ''',
+      [schemeCode],
+    );
+
+    if (result.isNotEmpty && result.first['totalUnits'] != null) {
+      return double.parse(result.first['totalUnits'].toString());
+    }
+    return 0.0;
+  }
+
+  Future<void> addRedemption({
+    required int schemeCode,
+    required String schemeName,
+    required double amount,
+    required double currentNav,
+  }) async {
+    final db = await instance.database;
+
+    final double unitsToSell = -(amount / currentNav);
+
+    await db.insert('transactions', {
+      'schemeCode': schemeCode,
+      'date': DateTime.now().toIso8601String(),
+      'amount': -amount,
+      'nav': currentNav,
+      'units': unitsToSell,
+    });
+
+    print('SUCCESS: Redeemed ₹$amount from $schemeName ($unitsToSell units)');
+  }
 }
