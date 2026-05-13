@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:mf_tracker/database/database_helper.dart';
 import 'package:mf_tracker/models/portfolio_item.dart';
+import 'package:mf_tracker/screens/fund_detail_screen.dart';
 import 'package:mf_tracker/utils/xirr_calculator.dart';
 
 class PortfolioScreen extends StatefulWidget {
@@ -45,10 +46,8 @@ class PortfolioScreenState extends State<PortfolioScreen> {
         if (response.statusCode == 200) {
           final decodedData = jsonDecode(response.body);
 
-          // 1. Safely extract the list
           final List<dynamic> dataList = decodedData['data'] ?? [];
 
-          // 2. Check if it actually has data
           if (dataList.isNotEmpty) {
             final String latestNavString = dataList[0]['nav'];
             final double liveNav = double.tryParse(latestNavString) ?? 0.0;
@@ -60,17 +59,14 @@ class PortfolioScreenState extends State<PortfolioScreen> {
               _grandTotalCurrent = tempCurrent;
             });
           } else {
-            // 3. Fallback for "dead" funds so the spinner stops
             setState(() {
               item.liveNav = 0.0;
               item.currentValue = 0.0;
-              // Note: We don't add to tempCurrent because it's 0
             });
           }
         }
       } catch (e) {
         print('Failed to fetch live NAV for ${item.schemeName}: $e');
-        // Stop the spinner even if there is a massive network failure
         setState(() {
           item.liveNav = 0.0;
           item.currentValue = 0.0;
@@ -95,7 +91,6 @@ class PortfolioScreenState extends State<PortfolioScreen> {
   List<PieChartSectionData> _generatePieSections() {
     if (_portfolio.isEmpty || _grandTotalCurrent <= 0) return [];
 
-    // A palette of colors for our different funds
     final List<Color> sectionColors = [
       Colors.blueAccent,
       Colors.orangeAccent,
@@ -108,17 +103,16 @@ class PortfolioScreenState extends State<PortfolioScreen> {
       final item = _portfolio[index];
       final itemValue = item.currentValue ?? 0;
 
-      // Calculate the percentage this fund makes up of the whole portfolio
       final percentage = (itemValue / _grandTotalCurrent) * 100;
 
       return PieChartSectionData(
         color:
             sectionColors[index %
-                sectionColors.length], // Loops colors if you have >5 funds
+                sectionColors.length], 
         value: itemValue,
         title: percentage > 5
             ? '${percentage.toStringAsFixed(1)}%'
-            : '', // Hide text if slice is too tiny
+            : '', 
         radius: 40,
         titleStyle: const TextStyle(
           fontSize: 10,
@@ -143,11 +137,9 @@ class PortfolioScreenState extends State<PortfolioScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: loadandCalculatePortfolio,
-              // We replaced the Column/Expanded with a ListView so it can scroll and refresh!
               child: ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: [
-                  // 1. Your Summary Card
                   Card(
                     margin: const EdgeInsets.all(16),
                     elevation: 4,
@@ -252,7 +244,6 @@ class PortfolioScreenState extends State<PortfolioScreen> {
                       ),
                     ),
 
-                  // 3. The List of Funds (Using Collection if + Spread Operator)
                   if (_portfolio.isEmpty)
                     const Padding(
                       padding: EdgeInsets.all(32.0),
@@ -260,7 +251,6 @@ class PortfolioScreenState extends State<PortfolioScreen> {
                     )
                   else
                     ..._portfolio.map((item) {
-                      // We need the index to assign the correct color circle
                       final index = _portfolio.indexOf(item);
 
                       return Card(
@@ -268,65 +258,221 @@ class PortfolioScreenState extends State<PortfolioScreen> {
                           horizontal: 16,
                           vertical: 8,
                         ),
-                        child: ListTile(
-                          leading: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: [
-                                Colors.blueAccent,
-                                Colors.orangeAccent,
-                                Colors.purpleAccent,
-                                Colors.tealAccent,
-                                Colors.pinkAccent,
-                              ][index % 5],
-                            ),
-                          ),
-                          title: Text(
-                            item.schemeName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle: Text(
-                            'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
-                          ),
-                          isThreeLine: true,
-                          trailing: item.currentValue == null
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      '₹${item.currentValue!.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 16,
-                                      ),
-                                    ),
-                                    Text(
-                                      'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
-                                      style: const TextStyle(
-                                        color: Colors.grey,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
+                        child: Column(
+                          children: [
+                            ListTile(
+                              leading: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: [
+                                    Colors.blueAccent,
+                                    Colors.orangeAccent,
+                                    Colors.purpleAccent,
+                                    Colors.tealAccent,
+                                    Colors.pinkAccent,
+                                  ][index % 5],
                                 ),
+                              ),
+                              title: Text(
+                                item.schemeName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              subtitle: Text(
+                                'Invested: ₹${item.totalInvested.toStringAsFixed(2)}\nUnits: ${item.totalUnits.toStringAsFixed(4)}',
+                              ),
+                              isThreeLine: true,
+                              trailing: item.currentValue == null
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.end,
+                                      children: [
+                                        Text(
+                                          '₹${item.currentValue!.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 16,
+                                          ),
+                                        ),
+                                        Text(
+                                          'NAV: ₹${item.liveNav!.toStringAsFixed(2)}',
+                                          style: const TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+
+                            const Divider(height: 1),
+
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                              children: [
+                                TextButton.icon(
+                                  onPressed: () =>
+                                      _showRedeemSheet(context, item),
+                                  icon: const Icon(
+                                    Icons.remove_circle_outline,
+                                    color: Colors.red,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Sell',
+                                    style: TextStyle(color: Colors.red),
+                                  ),
+                                ),
+
+                                TextButton.icon(
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => FundDetailScreen(
+                                          schemeCode: item.schemeCode,
+                                          schemeName: item.schemeName,
+                                        ),
+                                      ),
+                                    ).then(
+                                      (_) => loadandCalculatePortfolio(),
+                                    ); // Refresh when coming back!
+                                  },
+                                  icon: const Icon(
+                                    Icons.analytics_outlined,
+                                    color: Colors.blue,
+                                    size: 18,
+                                  ),
+                                  label: const Text(
+                                    'Details',
+                                    style: TextStyle(color: Colors.blue),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       );
-                    })
+                    }),
                 ],
               ),
             ),
+    );
+  }
+
+  void _showRedeemSheet(BuildContext context, PortfolioItem item) {
+    final TextEditingController amountController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(context).viewInsets.bottom,
+            left: 16,
+            right: 16,
+            top: 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Redeem from ${item.schemeName}',
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Currently Owned: ${item.totalUnits.toStringAsFixed(4)} units',
+                style: const TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: amountController,
+                keyboardType: TextInputType.number,
+                autofocus: true,
+                decoration: const InputDecoration(
+                  labelText: 'Redemption Amount (₹)',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  final amount = double.tryParse(amountController.text);
+                  if (amount == null || amount <= 0) return;
+
+                  if (item.liveNav == null || item.liveNav! <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please wait for live NAV to load."),
+                      ),
+                    );
+                    return;
+                  }
+
+                  final unitsToRedeem = amount / item.liveNav!;
+
+                  if (unitsToRedeem > item.totalUnits) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text(
+                          'Insufficient units to redeem this amount.',
+                        ),
+                      ),
+                    );
+                    return;
+                  }
+
+                  await DatabaseHelper.instance.addRedemption(
+                    schemeCode: item.schemeCode,
+                    schemeName: item.schemeName,
+                    amount: amount,
+                    currentNav: item.liveNav!,
+                  );
+
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Redemption successful.')),
+                    );
+
+                    loadandCalculatePortfolio();
+                  }
+                },
+
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  minimumSize: const Size(double.infinity, 50),
+                ),
+                child: const Text(
+                  'Confirm Redemption',
+                  style: TextStyle(color: Colors.white),
+                ),
+              ),
+              SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
     );
   }
 }
